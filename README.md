@@ -372,7 +372,6 @@ Not implemented yet:
 
 **Shortlisted idea:** Theme 4: AI Platform for Molecular Discovery in Chemical Catalysis and Synthetic Biology  
 **Project title:** CATALYST-X: Self-Learning AI Discovery Engine for Sustainable Chemistry  
-**Live deployment:** [https://catalyst-72rlxz3py-ashwin-goyals-projects.vercel.app](https://catalyst-72rlxz3py-ashwin-goyals-projects.vercel.app)  
 **Source repository:** [https://github.com/let-the-dreamers-rise/catalyst-x](https://github.com/let-the-dreamers-rise/catalyst-x)
 
 ---
