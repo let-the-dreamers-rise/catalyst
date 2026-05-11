@@ -87,11 +87,14 @@ export default function ProductTour({ isOpen, onClose, setActiveTab }) {
   const isLast = stepIndex === tourSteps.length - 1;
 
   return (
-    <div className="tour-backdrop" role="dialog" aria-modal="true" aria-labelledby="tour-title">
-      <div className="tour-panel">
+    <div className="tour-backdrop" role="presentation">
+      <div className="tour-panel" role="dialog" aria-modal="false" aria-labelledby="tour-title">
         <button className="icon-button tour-close" type="button" onClick={onClose} title="Close tour">
           <X size={18} />
         </button>
+        <div className="tour-step-pill">
+          Step {stepIndex + 1} of {tourSteps.length}
+        </div>
         <div className="tour-progress" aria-label="Product tour progress">
           {tourSteps.map((item, index) => (
             <span
@@ -101,7 +104,7 @@ export default function ProductTour({ isOpen, onClose, setActiveTab }) {
             />
           ))}
         </div>
-        <p className="tour-kicker">Product tour</p>
+        <p className="tour-kicker">Product navigator</p>
         <h2 id="tour-title">{step.title}</h2>
         <div className="tour-copy">
           <section>
@@ -109,7 +112,7 @@ export default function ProductTour({ isOpen, onClose, setActiveTab }) {
             <p>{step.matters}</p>
           </section>
           <section>
-            <span>What you can do</span>
+            <span>Try this</span>
             <p>{step.action}</p>
           </section>
           <section>
