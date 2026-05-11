@@ -1043,8 +1043,49 @@ h2 {
   height: 100%;
 }
 
+.molecule-canvas canvas {
+  display: block;
+  background: transparent !important;
+  transition: opacity 180ms ease;
+}
+
+.molecule-canvas.is-loading canvas {
+  opacity: 0;
+}
+
+.molecule-canvas.is-ready canvas {
+  opacity: 1;
+}
+
+.molecule-fallback {
+  position: absolute;
+  inset: 7% 7% 12%;
+  z-index: 1;
+  width: 86%;
+  height: 81%;
+  opacity: 1;
+  filter: drop-shadow(0 22px 38px rgba(80, 240, 177, 0.14));
+  transition: opacity 200ms ease;
+}
+
+.molecule-stage.is-webgl-ready .molecule-fallback {
+  opacity: 0;
+}
+
+.fallback-bond {
+  stroke: rgba(214, 255, 242, 0.5);
+  stroke-width: 0.45;
+  stroke-linecap: round;
+}
+
+.fallback-atom {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 0.28;
+}
+
 .molecule-caption {
   position: absolute;
+  z-index: 3;
   left: 14px;
   right: 14px;
   bottom: 14px;

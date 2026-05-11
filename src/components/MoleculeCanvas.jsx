@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 const palettes = {
@@ -51,16 +51,31 @@ export default function MoleculeCanvas({ candidate }) {
   const structure = candidate?.structure ?? "cluster";
   const colors = palettes[structure] ?? palettes.cluster;
   const atoms = useMemo(() => makeAtoms(structure), [structure]);
+  const [webglVisible, setWebglVisible] = useState(false);
 
   useEffect(() => {
     if (!hostRef.current) return undefined;
 
     const host = hostRef.current;
+    setWebglVisible(false);
+    if (!browserSupportsWebGL()) return undefined;
+
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
     camera.position.set(0, 0, 7);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: true,
+        powerPreference: "high-performance",
+      });
+    } catch {
+      return undefined;
+    }
+    renderer.setClearColor(0x000000, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(host.clientWidth, host.clientHeight);
     host.appendChild(renderer.domElement);
@@ -121,12 +136,21 @@ export default function MoleculeCanvas({ candidate }) {
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let frameId = 0;
+    let sampleFrames = 0;
+    let hasConfirmedPixels = false;
     const animate = () => {
       if (!reduceMotion) {
         group.rotation.y += 0.006;
         group.rotation.x = Math.sin(Date.now() * 0.00045) * 0.16;
       }
       renderer.render(scene, camera);
+      if (!hasConfirmedPixels && sampleFrames < 36) {
+        sampleFrames += 1;
+        if (sampleFrames > 3 && canvasHasVisiblePixels(renderer)) {
+          hasConfirmedPixels = true;
+          setWebglVisible(true);
+        }
+      }
       frameId = window.requestAnimationFrame(animate);
     };
 
@@ -151,12 +175,108 @@ export default function MoleculeCanvas({ candidate }) {
   }, [atoms, colors, structure]);
 
   return (
-    <div className="molecule-stage" aria-label={`${candidate?.name ?? "candidate"} structure preview`}>
-      <div ref={hostRef} className="molecule-canvas" />
+    <div
+      className={`molecule-stage ${webglVisible ? "is-webgl-ready" : "is-fallback-ready"}`}
+      aria-label={`${candidate?.name ?? "candidate"} structure preview`}
+    >
+      <MoleculeFallback atoms={atoms} colors={colors} structure={structure} />
+      <div ref={hostRef} className={`molecule-canvas ${webglVisible ? "is-ready" : "is-loading"}`} />
       <div className="molecule-caption">
         <span>{candidate?.class ?? "Candidate"}</span>
         <strong>{candidate?.id ?? "CX"}</strong>
       </div>
     </div>
   );
+}
+
+function canvasHasVisiblePixels(renderer) {
+  const gl = renderer.getContext();
+  const width = gl.drawingBufferWidth;
+  const height = gl.drawingBufferHeight;
+  if (!width || !height) return false;
+
+  const pixels = new Uint8Array(width * height * 4);
+  gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+  const stepX = Math.max(1, Math.floor(width / 28));
+  const stepY = Math.max(1, Math.floor(height / 22));
+  let visiblePixels = 0;
+
+  for (let y = 0; y < height; y += stepY) {
+    for (let x = 0; x < width; x += stepX) {
+      const index = (y * width + x) * 4;
+      const brightness = pixels[index] + pixels[index + 1] + pixels[index + 2];
+      if (pixels[index + 3] > 8 && brightness > 42) visiblePixels += 1;
+      if (visiblePixels > 8) return true;
+    }
+  }
+
+  return false;
+}
+
+function browserSupportsWebGL() {
+  try {
+    const canvas = document.createElement("canvas");
+    return Boolean(
+      window.WebGLRenderingContext &&
+        (canvas.getContext("webgl2") || canvas.getContext("webgl") || canvas.getContext("experimental-webgl")),
+    );
+  } catch {
+    return false;
+  }
+}
+
+function MoleculeFallback({ atoms, colors, structure }) {
+  const projected = useMemo(() => projectAtoms(atoms, structure), [atoms, structure]);
+
+  return (
+    <svg className="molecule-fallback" viewBox="0 0 100 100" role="img" aria-label="Molecular schematic fallback">
+      <defs>
+        <radialGradient id={`molecule-glow-${structure}`} cx="50%" cy="45%" r="55%">
+          <stop offset="0%" stopColor="#50f0b1" stopOpacity="0.34" />
+          <stop offset="55%" stopColor="#6ce5ff" stopOpacity="0.1" />
+          <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect x="0" y="0" width="100" height="100" fill={`url(#molecule-glow-${structure})`} />
+      {projected.slice(0, -1).map((atom, index) => {
+        if (index % 3 === 0 && structure !== "zeolite" && structure !== "rod") return null;
+        const next = projected[index + 1];
+        return (
+          <line
+            key={`${atom.x}-${atom.y}-${index}`}
+            x1={atom.x}
+            y1={atom.y}
+            x2={next.x}
+            y2={next.y}
+            className="fallback-bond"
+          />
+        );
+      })}
+      {projected.map((atom, index) => (
+        <circle
+          key={`${atom.x}-${atom.y}-${index}`}
+          cx={atom.x}
+          cy={atom.y}
+          r={atom.r}
+          fill={colors[atom.colorIndex]}
+          className="fallback-atom"
+        />
+      ))}
+    </svg>
+  );
+}
+
+function projectAtoms(atoms, structure) {
+  const scaleX = structure === "rod" ? 12.5 : structure === "zeolite" ? 15 : 18;
+  const scaleY = structure === "rod" ? 24 : 22;
+  const centerX = 50;
+  const centerY = 49;
+
+  return atoms.map((atom) => ({
+    x: centerX + atom.x * scaleX + atom.z * 3.2,
+    y: centerY + atom.y * scaleY - atom.z * 4.8,
+    r: Math.max(1.9, atom.radius * 17),
+    colorIndex: atom.colorIndex,
+  }));
 }
