@@ -27,7 +27,8 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { guideSections, knowledgeSignals, modelSignals, pathwayPrograms, retrievalRows } from "../data/catalystData";
+import { guideSections, pathwayPrograms } from "../data/catalystData";
+import { priorityPresets } from "../data/discoveryEngine.js";
 import { ComparisonBars, DriftMatrix, ProgressBar, RadarChart } from "./Charts.jsx";
 import MoleculeCanvas from "./MoleculeCanvas.jsx";
 
@@ -38,12 +39,14 @@ export function Overview({
   shortlisted,
   setActiveTab,
   setSelectedCandidateId,
+  discovery,
 }) {
-  const topCandidate = candidates[0];
-  const driftRecords = records.filter((record) => Math.abs(record.predictedYield - record.observedYield) >= 10);
-  const averageScore = Math.round(
-    candidates.reduce((total, candidate) => total + candidate.discoveryScore, 0) / Math.max(candidates.length, 1),
-  );
+  const topCandidate = discovery?.topCandidate ?? candidates[0];
+  const driftRecords =
+    discovery?.driftRecords ?? records.filter((record) => Math.abs(record.predictedYield - record.observedYield) >= 10);
+  const averageScore = discovery?.scoreAverage ?? 0;
+  const knowledge = discovery?.knowledgeSignals ?? [];
+  const events = discovery?.workflowEvents ?? [];
 
   return (
     <div className="view-grid overview-grid">
@@ -89,7 +92,7 @@ export function Overview({
           <h2>Learning signal</h2>
         </div>
         <div className="signal-grid">
-          {knowledgeSignals.map((signal) => (
+          {knowledge.map((signal) => (
             <div key={signal.label} className={`signal-block tone-${signal.tone}`}>
               <span>{signal.label}</span>
               <strong>{signal.value}</strong>
@@ -112,8 +115,8 @@ export function Overview({
         <div className="pipeline-lanes">
           {[
             ["Target", activeReaction.stage, "reaction"],
-            ["Retrieve", `${activeReaction.sources.length} source groups`, "reaction"],
-            ["Generate", `${candidates.length} ranked candidates`, "atlas"],
+            ["Retrieve", `${discovery?.evidenceDepth ?? 0}% evidence depth`, "reaction"],
+            ["Generate", `${discovery?.generatedCount ?? candidates.length} generated`, "atlas"],
             ["Test", `${shortlisted.length} queued`, "feedback"],
             ["Learn", `${driftRecords.length} drift flags`, "learning"],
           ].map(([label, value, tab]) => (
@@ -163,12 +166,7 @@ export function Overview({
           <h2>Recent system events</h2>
         </div>
         <div className="event-stream">
-          {[
-            ["Retrieval", "14 new CO2 hydrogenation records normalized with reaction conditions."],
-            ["Generation", "Surface motif generator produced 23 Cu-Zr vacancy variants."],
-            ["Feedback", "Model drift detected on coke formation in ethanol upgrading run EXP-2411."],
-            ["Learning", "Negative enzyme stability results increased impurity penalty weight."],
-          ].map(([label, body]) => (
+          {events.map(([label, body]) => (
             <div className="event-row" key={body}>
               <span>{label}</span>
               <p>{body}</p>
@@ -180,22 +178,19 @@ export function Overview({
   );
 }
 
-export function ReactionStudio({ activeReaction, candidates, onOpenAtlas }) {
-  const [temperature, setTemperature] = useState(activeReaction.constraints.temperature);
-  const [pressure, setPressure] = useState(activeReaction.constraints.pressure);
-  const [stability, setStability] = useState(activeReaction.constraints.stabilityHours);
-  const [criticalMetal, setCriticalMetal] = useState(activeReaction.constraints.maxCriticalMetal);
-  const [runCount, setRunCount] = useState(1);
-
-  useEffect(() => {
-    setTemperature(activeReaction.constraints.temperature);
-    setPressure(activeReaction.constraints.pressure);
-    setStability(activeReaction.constraints.stabilityHours);
-    setCriticalMetal(activeReaction.constraints.maxCriticalMetal);
-  }, [activeReaction]);
-
-  const rows = retrievalRows.filter((row) => row.reactionId === activeReaction.id);
-  const retrievalDepth = Math.min(98, 62 + rows.length * 8 + runCount * 3);
+export function ReactionStudio({
+  activeReaction,
+  candidates,
+  campaign,
+  discovery,
+  onCampaignChange,
+  onPriorityChange,
+  onRunDiscovery,
+  onOpenAtlas,
+}) {
+  const rows = discovery.retrievalRows;
+  const retrievalDepth = discovery.evidenceDepth;
+  const topCandidate = discovery.topCandidate ?? candidates[0];
 
   return (
     <div className="view-grid reaction-grid">
@@ -209,20 +204,27 @@ export function ReactionStudio({ activeReaction, candidates, onOpenAtlas }) {
         <div className="constraint-stack">
           <RangeControl
             label="Temperature"
-            value={temperature}
+            value={campaign.temperature}
             min={120}
             max={420}
             unit="deg C"
-            onChange={setTemperature}
+            onChange={(temperature) => onCampaignChange({ temperature })}
           />
-          <RangeControl label="Pressure" value={pressure} min={1} max={80} unit="bar" onChange={setPressure} />
+          <RangeControl
+            label="Pressure"
+            value={campaign.pressure}
+            min={1}
+            max={80}
+            unit="bar"
+            onChange={(pressure) => onCampaignChange({ pressure })}
+          />
           <RangeControl
             label="Stability target"
-            value={stability}
+            value={campaign.stabilityHours}
             min={24}
             max={240}
             unit="h"
-            onChange={setStability}
+            onChange={(stabilityHours) => onCampaignChange({ stabilityHours })}
           />
         </div>
 
@@ -230,19 +232,60 @@ export function ReactionStudio({ activeReaction, candidates, onOpenAtlas }) {
           {["Low", "Medium", "Open"].map((level) => (
             <button
               key={level}
-              className={criticalMetal === level ? "is-selected" : ""}
+              className={campaign.maxCriticalMetal === level ? "is-selected" : ""}
               type="button"
-              onClick={() => setCriticalMetal(level)}
+              onClick={() => onCampaignChange({ maxCriticalMetal: level })}
             >
               {level}
             </button>
           ))}
         </div>
 
+        <div className="priority-grid" aria-label="Discovery priority">
+          {Object.entries(priorityPresets).map(([key, preset]) => (
+            <button
+              className={`priority-card ${campaign.priority === key ? "is-selected" : ""}`}
+              key={key}
+              type="button"
+              onClick={() => onPriorityChange(key)}
+            >
+              <strong>{preset.label}</strong>
+              <span>{preset.description}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="constraint-stack">
+          <RangeControl
+            label="Generated families"
+            value={campaign.generationBudget}
+            min={4}
+            max={18}
+            unit=""
+            onChange={(generationBudget) => onCampaignChange({ generationBudget })}
+          />
+          <RangeControl
+            label="Diversity pressure"
+            value={campaign.diversity}
+            min={20}
+            max={95}
+            unit="%"
+            onChange={(diversity) => onCampaignChange({ diversity })}
+          />
+          <RangeControl
+            label="Evidence threshold"
+            value={campaign.evidenceThreshold}
+            min={45}
+            max={92}
+            unit="%"
+            onChange={(evidenceThreshold) => onCampaignChange({ evidenceThreshold })}
+          />
+        </div>
+
         <div className="action-row">
-          <button className="button primary" type="button" onClick={() => setRunCount((count) => count + 1)}>
+          <button className="button primary" type="button" onClick={onRunDiscovery}>
             <RefreshCcw size={17} />
-            Run retrieval
+            Refresh discovery run
           </button>
           <button className="button ghost" type="button" onClick={onOpenAtlas}>
             <Sparkles size={17} />
@@ -271,7 +314,7 @@ export function ReactionStudio({ activeReaction, candidates, onOpenAtlas }) {
           <div className="table-row table-head" role="row">
             <span>Material</span>
             <span>Condition</span>
-            <span>Confidence</span>
+            <span>Relevance</span>
           </div>
           {rows.map((row) => (
             <div className="table-row" role="row" key={row.id}>
@@ -279,8 +322,11 @@ export function ReactionStudio({ activeReaction, candidates, onOpenAtlas }) {
                 <strong>{row.material}</strong>
                 <small>{row.source}</small>
               </span>
-              <span>{row.condition}</span>
-              <span>{row.confidence}%</span>
+              <span>
+                {row.condition}
+                <small>{row.matchReason}</small>
+              </span>
+              <span>{row.relevance}%</span>
             </div>
           ))}
         </div>
@@ -293,10 +339,11 @@ export function ReactionStudio({ activeReaction, candidates, onOpenAtlas }) {
         </div>
         <div className="recipe-grid">
           {[
-            ["Search space", `${candidates.length * 42} structure variants`],
-            ["Constraint guardrail", `${criticalMetal} critical-metal exposure`],
+            ["Search space", `${discovery.screenedVariants} structure variants`],
+            ["Rejected by guardrails", `${discovery.excludedCount} candidates`],
+            ["Constraint guardrail", `${campaign.maxCriticalMetal} critical-metal exposure`],
             ["Simulation scope", "energy, stability, selectivity, yield"],
-            ["Export target", "top 6 candidates with provenance pack"],
+            ["Top recommendation", topCandidate?.name ?? "No candidate selected"],
           ].map(([label, value]) => (
             <div className="recipe-row" key={label}>
               <span>{label}</span>
@@ -305,9 +352,13 @@ export function ReactionStudio({ activeReaction, candidates, onOpenAtlas }) {
           ))}
         </div>
         <div className="mini-graph" aria-label="Retrieval and generation depth">
-          {[42, retrievalDepth, 58 + runCount * 5, 76, 64].map((value, index) => (
+          {[42, retrievalDepth, discovery.generatedCount * 5, discovery.scoreAverage, topCandidate?.labReadiness ?? 64].map((value, index) => (
             <span key={`${value}-${index}`} style={{ height: `${value}%` }} />
           ))}
+        </div>
+        <div className="run-strip">
+          <CheckCircle2 size={17} />
+          <span>{campaign.lastRunLabel}</span>
         </div>
       </section>
     </div>
@@ -324,6 +375,7 @@ export function CandidateAtlas({
   onShortlist,
   onQueueCandidate,
   records,
+  discovery,
 }) {
   const [query, setQuery] = useState("");
   const [route, setRoute] = useState("All");
@@ -332,11 +384,15 @@ export function CandidateAtlas({
   const visibleCandidates = useMemo(() => {
     return candidates
       .filter((candidate) => {
-        const matchesRoute = route === "All" || candidate.route === route || candidate.class === route;
+        const matchesRoute =
+          route === "All" ||
+          candidate.route === route ||
+          candidate.class === route ||
+          (route === "Ready for lab" && candidate.labReadiness >= 74);
         const text = `${candidate.name} ${candidate.class} ${candidate.summary}`.toLowerCase();
         return matchesRoute && text.includes(query.toLowerCase());
       })
-      .sort((a, b) => b[sortBy] - a[sortBy]);
+      .sort((a, b) => (sortBy === "synthesisRisk" ? a[sortBy] - b[sortBy] : b[sortBy] - a[sortBy]));
   }, [candidates, query, route, sortBy]);
 
   useEffect(() => {
@@ -365,9 +421,13 @@ export function CandidateAtlas({
             <option>Synthetic biology</option>
             <option>Heterogeneous catalyst</option>
             <option>Enzyme variant</option>
+            <option>Ready for lab</option>
           </select>
           <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} aria-label="Sort candidates">
             <option value="discoveryScore">Discovery score</option>
+            <option value="labReadiness">Lab readiness</option>
+            <option value="campaignFit">Campaign fit</option>
+            <option value="evidenceStrength">Evidence strength</option>
             <option value="novelty">Novelty</option>
             <option value="synthesisRisk">Synthesis risk</option>
           </select>
@@ -382,7 +442,9 @@ export function CandidateAtlas({
             >
               <span>
                 <strong>{candidate.name}</strong>
-                <small>{candidate.class}</small>
+                <small>
+                  Rank {candidate.rank} {candidate.rankDelta ? `(${candidate.rankDelta > 0 ? "+" : ""}${candidate.rankDelta})` : "(stable)"} · {candidate.class}
+                </small>
               </span>
               <span className="candidate-score">{candidate.discoveryScore}</span>
             </button>
@@ -414,6 +476,20 @@ export function CandidateAtlas({
                 {active.provenance}
               </span>
             </div>
+            <div className="candidate-readout">
+              <div>
+                <span>Campaign fit</span>
+                <strong>{active.campaignFit}%</strong>
+              </div>
+              <div>
+                <span>Evidence</span>
+                <strong>{active.evidenceStrength}%</strong>
+              </div>
+              <div>
+                <span>Lab ready</span>
+                <strong>{active.labReadiness}%</strong>
+              </div>
+            </div>
             <RadarChart metrics={active.predicted} />
             <div className="action-row">
               <button className="button secondary" type="button" onClick={() => onShortlist(active.id)}>
@@ -443,6 +519,13 @@ export function CandidateAtlas({
               <span>Next experiment</span>
               <p>{active.nextExperiment}</p>
               <small>{active.uncertainty}</small>
+            </div>
+            <div className="experiment-callout">
+              <span>Run context</span>
+              <p>
+                {discovery.campaignLabel}: {discovery.generatedCount} generated families, {discovery.excludedCount} rejected by guardrails.
+              </p>
+              <small>Ranking updates when Reaction Studio constraints change.</small>
             </div>
             <ComparisonBars candidate={active} records={records} />
           </section>
@@ -757,12 +840,14 @@ export function FeedbackLoop({
   );
 }
 
-export function LearningLoop({ records }) {
+export function LearningLoop({ records, activeReaction, discovery }) {
   const [trainingState, setTrainingState] = useState("Ready");
-  const recordErrors = records.map((record) => Math.abs(record.predictedYield - record.observedYield));
+  const scopedRecords = discovery?.reactionRecords ?? records;
+  const recordErrors = scopedRecords.map((record) => Math.abs(record.predictedYield - record.observedYield));
   const meanError = Math.round(recordErrors.reduce((total, value) => total + value, 0) / Math.max(recordErrors.length, 1));
-  const readiness = Math.min(98, 74 + records.length * 3);
-  const driftCount = records.filter((record) => record.status === "Model drift").length;
+  const readiness = discovery?.readiness ?? Math.min(98, 74 + records.length * 3);
+  const driftCount = scopedRecords.filter((record) => record.status === "Model drift").length;
+  const signals = discovery?.modelSignals ?? [];
 
   const startTraining = () => {
     setTrainingState("Training");
@@ -774,7 +859,7 @@ export function LearningLoop({ records }) {
       <section className="panel learning-command">
         <div className="section-heading">
           <span>Self-improving engine</span>
-          <h2>Retraining readiness</h2>
+          <h2>{activeReaction?.product ?? "Reaction"} retraining readiness</h2>
         </div>
         <div className="learning-meter">
           <div style={{ "--ready": readiness }}>
@@ -807,7 +892,7 @@ export function LearningLoop({ records }) {
           <span>Blind spot map</span>
           <h2>Prediction drift by domain</h2>
         </div>
-        <DriftMatrix signals={modelSignals} />
+        <DriftMatrix signals={signals} />
       </section>
 
       <section className="panel hypotheses-panel">
@@ -816,7 +901,7 @@ export function LearningLoop({ records }) {
           <h2>What the platform learned</h2>
         </div>
         <div className="hypothesis-stack">
-          {modelSignals.map((signal) => (
+          {signals.map((signal) => (
             <div className="hypothesis-row" key={signal.id}>
               <span>{signal.label}</span>
               <p>{signal.action}</p>
@@ -930,6 +1015,7 @@ function RangeControl({ label, value, min, max, unit, onChange }) {
         </strong>
       </div>
       <input
+        aria-label={label}
         type="range"
         min={min}
         max={max}

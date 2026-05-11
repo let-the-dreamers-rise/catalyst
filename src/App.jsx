@@ -24,7 +24,8 @@ import {
   ProductGuide,
   ReactionStudio,
 } from "./components/Views.jsx";
-import { candidates, initialExperimentRecords, navItems, reactions } from "./data/catalystData.js";
+import { candidates, initialExperimentRecords, navItems, reactions, retrievalRows } from "./data/catalystData.js";
+import { applyPriorityPreset, buildDiscoveryState, createInitialCampaigns } from "./data/discoveryEngine.js";
 
 const navIcons = {
   overview: Home,
@@ -42,6 +43,7 @@ function App() {
   const [selectedCandidateId, setSelectedCandidateId] = useState("CX-1047");
   const [shortlisted, setShortlisted] = useState(["CX-1047"]);
   const [records, setRecords] = useState(initialExperimentRecords);
+  const [campaigns, setCampaigns] = useState(() => createInitialCampaigns(reactions));
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -49,10 +51,23 @@ function App() {
   });
 
   const activeReaction = reactions.find((reaction) => reaction.id === selectedReactionId) ?? reactions[0];
-  const reactionCandidates = useMemo(
+  const activeCampaign = campaigns[activeReaction.id] ?? createInitialCampaigns([activeReaction])[activeReaction.id];
+  const baseReactionCandidates = useMemo(
     () => candidates.filter((candidate) => candidate.reactionId === activeReaction.id),
     [activeReaction.id],
   );
+  const discovery = useMemo(
+    () =>
+      buildDiscoveryState({
+        reaction: activeReaction,
+        candidates: baseReactionCandidates,
+        retrievalRows,
+        records,
+        campaign: activeCampaign,
+      }),
+    [activeReaction, activeCampaign, baseReactionCandidates, records],
+  );
+  const reactionCandidates = discovery.candidates;
   const selectedCandidate =
     reactionCandidates.find((candidate) => candidate.id === selectedCandidateId) ?? reactionCandidates[0];
 
@@ -62,6 +77,10 @@ function App() {
     }
   }, [reactionCandidates, selectedCandidateId]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0 });
+  }, [activeTab, selectedReactionId]);
+
   const closeTour = () => {
     window.localStorage.setItem("catalystx-tour-complete", "true");
     setTourOpen(false);
@@ -69,6 +88,41 @@ function App() {
 
   const openTour = () => {
     setTourOpen(true);
+  };
+
+  const updateCampaign = (patch) => {
+    setCampaigns((current) => ({
+      ...current,
+      [activeReaction.id]: {
+        ...(current[activeReaction.id] ?? activeCampaign),
+        ...patch,
+      },
+    }));
+  };
+
+  const updateCampaignPriority = (priority) => {
+    setCampaigns((current) => ({
+      ...current,
+      [activeReaction.id]: applyPriorityPreset(current[activeReaction.id] ?? activeCampaign, priority),
+    }));
+  };
+
+  const runDiscovery = () => {
+    setCampaigns((current) => {
+      const existing = current[activeReaction.id] ?? activeCampaign;
+      const nextRun = existing.runCount + 1;
+      return {
+        ...current,
+        [activeReaction.id]: {
+          ...existing,
+          runCount: nextRun,
+          lastRunLabel: `Run ${nextRun} refreshed ${new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}`,
+        },
+      };
+    });
   };
 
   const toggleShortlist = (candidateId) => {
@@ -94,6 +148,11 @@ function App() {
           <ReactionStudio
             activeReaction={activeReaction}
             candidates={reactionCandidates}
+            campaign={activeCampaign}
+            discovery={discovery}
+            onCampaignChange={updateCampaign}
+            onPriorityChange={updateCampaignPriority}
+            onRunDiscovery={runDiscovery}
             onOpenAtlas={() => setActiveTab("atlas")}
           />
         );
@@ -109,6 +168,7 @@ function App() {
             onShortlist={toggleShortlist}
             onQueueCandidate={queueCandidate}
             records={records}
+            discovery={discovery}
           />
         );
       case "bio":
@@ -122,10 +182,11 @@ function App() {
             onShortlist={toggleShortlist}
             onAddRecord={addRecord}
             activeReaction={activeReaction}
+            campaign={activeCampaign}
           />
         );
       case "learning":
-        return <LearningLoop records={records} />;
+        return <LearningLoop records={records} activeReaction={activeReaction} discovery={discovery} />;
       case "guide":
         return <ProductGuide onOpenTour={openTour} setActiveTab={setActiveTab} />;
       case "overview":
@@ -138,6 +199,7 @@ function App() {
             shortlisted={shortlisted}
             setActiveTab={setActiveTab}
             setSelectedCandidateId={setSelectedCandidateId}
+            discovery={discovery}
           />
         );
     }
@@ -180,7 +242,7 @@ function App() {
         <div className="nav-footer">
           <div className="nav-status">
             <span>Model health</span>
-            <strong>Learning</strong>
+            <strong>{discovery.campaignLabel}</strong>
           </div>
           <button className="button ghost wide" type="button" onClick={openTour}>
             <CircleHelp size={17} />
@@ -216,7 +278,7 @@ function App() {
           </button>
           <div className="system-pill">
             <Microscope size={16} />
-            {records.length} lab records
+            {discovery.reactionRecords.length} active records
           </div>
         </header>
 

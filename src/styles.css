@@ -817,6 +817,44 @@ h2 {
   background: var(--mint);
 }
 
+.priority-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.priority-card {
+  min-height: 94px;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 12px;
+  color: var(--soft);
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.priority-card strong {
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.priority-card span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.priority-card.is-selected {
+  border-color: rgba(80, 240, 177, 0.42);
+  background:
+    linear-gradient(135deg, rgba(80, 240, 177, 0.14), rgba(255, 206, 115, 0.08)),
+    rgba(255, 255, 255, 0.05);
+}
+
 .source-stack {
   margin-bottom: 15px;
 }
@@ -890,6 +928,20 @@ h2 {
   min-height: 20px;
   background: linear-gradient(180deg, var(--cyan), var(--mint));
   border-radius: 6px 6px 2px 2px;
+}
+
+.run-strip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 11px 12px;
+  color: var(--mint);
+  border: 1px solid rgba(80, 240, 177, 0.24);
+  border-radius: var(--radius);
+  background: rgba(80, 240, 177, 0.08);
+  font-size: 0.86rem;
+  font-weight: 750;
 }
 
 .toolbar {
@@ -1022,6 +1074,36 @@ h2 {
   align-items: flex-start;
   padding: 10px;
   color: var(--soft);
+}
+
+.candidate-readout {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.candidate-readout div {
+  min-height: 78px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.candidate-readout span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.candidate-readout strong {
+  color: var(--mint);
+  font-size: 1.34rem;
 }
 
 .radar-wrap {
@@ -1839,6 +1921,7 @@ h2 {
   }
 
   .pipeline-lanes,
+  .priority-grid,
   .strain-kpis,
   .learning-kpis,
   .drift-matrix,
@@ -1856,6 +1939,10 @@ h2 {
   }
 
   .radar-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .candidate-readout {
     grid-template-columns: 1fr;
   }
 

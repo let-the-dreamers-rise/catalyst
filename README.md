@@ -5,7 +5,7 @@ CATALYST-X is a product prototype for an AI-powered discovery operating system t
 Unlike a static prediction dashboard, CATALYST-X is designed around a closed scientific loop: define a target reaction, retrieve prior evidence, generate candidate designs, predict performance, send candidates to the lab, capture outcomes, and feed the results back into the next discovery cycle.
 
 Live app: [https://catalyst-72rlxz3py-ashwin-goyals-projects.vercel.app](https://catalyst-72rlxz3py-ashwin-goyals-projects.vercel.app)  
-Source code: [https://github.com/let-the-dreamers-rise/catalyst-x](https://github.com/let-the-dreamers-rise/catalyst-x)
+Source code: [https://github.com/let-the-dreamers-rise/catalyst](https://github.com/let-the-dreamers-rise/catalyst)
 
 ---
 
@@ -42,6 +42,8 @@ CATALYST-X turns this into an integrated workflow where both successful and fail
 
 CATALYST-X is intended to feel like a research product, not a presentation mockup. The prototype includes real product navigation, meaningful state changes, realistic sample records, workflow tabs, a guided product tour, and interactive candidate/feedback flows.
 
+The current build also includes a frontend discovery-scoring engine. When the user changes Reaction Studio settings such as temperature, pressure, stability target, critical-metal exposure, search priority, generation budget, diversity, or evidence threshold, the app recalculates retrieval relevance, generated candidate counts, candidate scores, campaign fit, lab readiness, uncertainty, next experiment guidance, overview metrics, and learning-loop signals.
+
 ---
 
 ## What The Prototype Includes
@@ -66,6 +68,8 @@ The reaction studio lets a researcher define the transformation and operating co
 - Pressure window
 - Stability target
 - Critical-metal exposure preference
+- Discovery priority presets
+- Generation budget, diversity pressure, and evidence threshold
 - Retrieved precedents from simulated scientific sources
 - Evidence confidence scores
 - Candidate search plan
@@ -80,6 +84,8 @@ The candidate atlas ranks generated candidates and lets the user inspect why eac
 - Predicted activity, selectivity, stability, yield, and carbon efficiency
 - Three.js molecular preview
 - Model rationale
+- Campaign fit, evidence strength, and lab-readiness readouts
+- Ranking updates driven by Reaction Studio settings
 - Next experiment recommendation
 - Shortlist and send-to-feedback actions
 
@@ -168,6 +174,9 @@ Data Layer In Prototype
   Retrieval records
   Synthetic biology pathway records
   Experiment feedback records
+  Frontend discovery-scoring engine
+  Constraint-driven candidate re-ranking
+  Dynamic evidence and learning signals
 
 Future Backend
   FastAPI service
@@ -310,7 +319,8 @@ Implemented:
 - Guided onboarding tour
 - Responsive desktop and mobile layouts
 - Reaction configuration workflow
-- Candidate ranking and filtering
+- Constraint-driven candidate ranking and filtering
+- Interactive discovery scoring engine
 - Three.js molecular visualization
 - Synthetic biology pathway map
 - Experiment feedback form
@@ -372,7 +382,7 @@ Not implemented yet:
 
 **Shortlisted idea:** Theme 4: AI Platform for Molecular Discovery in Chemical Catalysis and Synthetic Biology  
 **Project title:** CATALYST-X: Self-Learning AI Discovery Engine for Sustainable Chemistry  
-**Source repository:** [https://github.com/let-the-dreamers-rise/catalyst-x](https://github.com/let-the-dreamers-rise/catalyst-x)
+**Source repository:** [https://github.com/let-the-dreamers-rise/catalyst](https://github.com/let-the-dreamers-rise/catalyst)
 
 ---
 
